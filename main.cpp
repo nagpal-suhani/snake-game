@@ -1,7 +1,10 @@
 
-
 #include <iostream>
-#include <conio.h>
+#include <thread>
+#include <chrono>
+#include <cstdlib>
+#include <ctime>
+
 using namespace std;
 
 void run();
@@ -27,7 +30,7 @@ int map[size];
 // Snake head details
 int headxpos;
 int headypos;
-int direction;
+int direction = 1; // Default direction: right
 
 // Amount of food the snake has (How long the body is)
 int food = 4;
@@ -44,15 +47,21 @@ int main()
 // Main game function
 void run()
 {
+    // Seed random number generator
+    srand(time(0));
+
     // Initialize the map
     initMap();
     running = true;
+
     while (running) {
         // If a key is pressed
-        if (kbhit()) {
-            // Change to direction determined by key pressed
-            changeDirection(getch());
+        if (cin.peek() != EOF) {
+            char key;
+            cin >> key; // Get the key
+            changeDirection(key);
         }
+
         // Update the map
         update();
 
@@ -62,159 +71,128 @@ void run()
         // Print the map
         printMap();
 
-        // delay 0.4 seconds
-        _sleep(400);
+        // Delay 0.4 seconds
+        this_thread::sleep_for(chrono::milliseconds(400));
     }
 
-    // Game Text
-    cout << "\t\tGame Over!" << endl << "\t\tYour score is: " << food;
+    // Game Over Text
+    cout << "\t\tGame Over!" << endl
+         << "\t\tYour score is: " << food << endl;
 
     // Stop console from closing instantly
     cin.ignore();
+    cin.get();
 }
 
 // Changes snake direction from input
 void changeDirection(char key) {
-    /*
-      W
-    A + D
-      S
-      1
-    4 + 2
-      3
-    */
     switch (key) {
     case 'w':
-        if (direction != 2) direction = 0;
+        if (direction != 2) direction = 0; // Up
         break;
     case 'd':
-        if (direction != 3) direction = 1;
+        if (direction != 3) direction = 1; // Right
         break;
     case 's':
-        if (direction != 4) direction = 2;
+        if (direction != 0) direction = 2; // Down
         break;
     case 'a':
-        if (direction != 5) direction = 3;
+        if (direction != 1) direction = 3; // Left
         break;
     }
 }
 
 // Moves snake head to new location
 void move(int dx, int dy) {
-    // determine new head position
     int newx = headxpos + dx;
     int newy = headypos + dy;
 
-    // Check if there is food at location
-    if (map[newx + newy * mapwidth] == -2) {
-        // Increase food value (body length)
-        food++;
-
-        // Generate new food on map
-        generateFood();
+    // Check boundaries
+    if (newx < 0 || newx >= mapwidth || newy < 0 || newy >= mapheight || map[newx + newy * mapwidth] == -1) {
+        running = false;
+        return;
     }
 
-    // Check location is free
-    else if (map[newx + newy * mapwidth] != 0) {
+    // Check if there is food at the location
+    if (map[newx + newy * mapwidth] == -2) {
+        food++;
+        generateFood();
+    } else if (map[newx + newy * mapwidth] != 0) {
+        // If colliding with self
         running = false;
+        return;
     }
 
     // Move head to new location
     headxpos = newx;
     headypos = newy;
     map[headxpos + headypos * mapwidth] = food + 1;
-
 }
 
-// Clears screen
+// Clears the screen
 void clearScreen() {
-    // Clear the screen
-    system("cls");
+    system("clear"); // Use "cls" for Windows, "clear" for Linux/Mac
 }
 
 // Generates new food on map
 void generateFood() {
-    int x = 0;
-    int y = 0;
+    int x, y;
     do {
-        // Generate random x and y values within the map
-        x = rand() % (mapwidth - 2) + 1;
-        y = rand() % (mapheight - 2) + 1;
-
-        // If location is not free try again
+        x = rand() % mapwidth;
+        y = rand() % mapheight;
     } while (map[x + y * mapwidth] != 0);
 
-    // Place new food
     map[x + y * mapwidth] = -2;
 }
 
 // Updates the map
 void update() {
-    // Move in direction indicated
     switch (direction) {
-    case 0: move(-1, 0);
-        break;
-    case 1: move(0, 1);
-        break;
-    case 2: move(1, 0);
-        break;
-    case 3: move(0, -1);
-        break;
+    case 0: move(0, -1); break; // Up
+    case 1: move(1, 0); break;  // Right
+    case 2: move(0, 1); break;  // Down
+    case 3: move(-1, 0); break; // Left
     }
 
-    // Reduce snake values on map by 1
+    // Reduce snake body values on map
     for (int i = 0; i < size; i++) {
         if (map[i] > 0) map[i]--;
     }
 }
 
 // Initializes map
-void initMap()
-{
-    // Places the initual head location in middle of map
+void initMap() {
     headxpos = mapwidth / 2;
     headypos = mapheight / 2;
-    map[headxpos + headypos * mapwidth] = 1;
+    map[headxpos + headypos * mapwidth] = food;
 
-    // Places top and bottom walls 
+    // Create walls
     for (int x = 0; x < mapwidth; ++x) {
         map[x] = -1;
         map[x + (mapheight - 1) * mapwidth] = -1;
     }
-
-    // Places left and right walls
-    for (int y = 0; y < mapheight; y++) {
-        map[0 + y * mapwidth] = -1;
+    for (int y = 0; y < mapheight; ++y) {
+        map[y * mapwidth] = -1;
         map[(mapwidth - 1) + y * mapwidth] = -1;
     }
 
-    // Generates first food
     generateFood();
 }
 
-// Prints the map to console
-void printMap()
-{
-    for (int x = 0; x < mapwidth; ++x) {
-        for (int y = 0; y < mapheight; ++y) {
-            // Prints the value at current x,y location
+// Prints the map
+void printMap() {
+    for (int y = 0; y < mapheight; ++y) {
+        for (int x = 0; x < mapwidth; ++x) {
             cout << getMapValue(map[x + y * mapwidth]);
         }
-        // Ends the line for next x value
         cout << endl;
     }
 }
 
-// Returns graphical character for display from map value
-char getMapValue(int value)
-{
-    // Returns a part of snake body
-    if (value > 0) return 'o';
-
-    switch (value) {
-        // Return wall
-    case -1: return 'X';
-        // Return food
-    case -2: return 'O';
-    }
+// Returns graphical character for display
+char getMapValue(int value) {
+    if (value > 0) return 'o'; // Snake body
+    if (value == -1) return 'X'; // Wall
+    if (value == -2) return 'O'; // Food
+    return ' '; // Empty space
 }
